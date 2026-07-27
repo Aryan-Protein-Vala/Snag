@@ -84,6 +84,7 @@ class FileRowWidget(QWidget):
         self.btn_reveal.hide()
         self.btn_reveal.clicked.connect(lambda: reveal_in_explorer(self.file_path))
 
+        self.main_layout = layout
         layout.addWidget(icon_lbl)
         layout.addWidget(self.name_lbl, 1)
         layout.addWidget(self.btn_reveal)
@@ -91,11 +92,13 @@ class FileRowWidget(QWidget):
     def enterEvent(self, event):
         self.btn_reveal.show()
         self.setStyleSheet("background: #262626; border-radius: 6px;")
+        self.main_layout.setContentsMargins(16, 8, 12, 8) # Bounce right effect
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.btn_reveal.hide()
         self.setStyleSheet("background: transparent;")
+        self.main_layout.setContentsMargins(10, 8, 6, 8) # Revert bounce
         super().leaveEvent(event)
 
 
@@ -403,17 +406,17 @@ class MainWindow(QMainWindow):
         tab_bar.setSpacing(0)
         self._tab_btns: list[QPushButton] = []
         tab_labels = ["Screenshots", "Downloads", "Clipboard", "Snippets"]
-        tab_short   = ["Scrn",       "Down",      "Clip",      "Snip"]
+        tab_icons  = ["🖼️", "📥", "📋", "📌"]
 
-        for i, (lbl, short) in enumerate(zip(tab_labels, tab_short)):
-            btn = QPushButton(short)
+        for i, (lbl, icon_char) in enumerate(zip(tab_labels, tab_icons)):
+            btn = QPushButton(icon_char)
             btn.setToolTip(lbl)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setCheckable(True)
             btn.setStyleSheet("""
                 QPushButton {
-                    background: transparent; color: #555; border: none;
-                    font-size: 12px; font-weight: 600; padding: 6px 8px;
+                    background: transparent; color: #777; border: none;
+                    font-size: 16px; padding: 6px 12px;
                     border-bottom: 2px solid transparent;
                 }
                 QPushButton:hover  { color: #AAA; }

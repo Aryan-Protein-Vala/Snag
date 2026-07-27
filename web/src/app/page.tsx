@@ -164,7 +164,12 @@ function DownloadModal({ platform, onClose }: { platform: Platform; onClose: () 
 }
 
 // ─── Interactive Widget Preview ────────────────────────────────────────────
-const TABS = ["Screenshots", "Downloads", "Clipboard", "Snippets"];
+const TABS = [
+  { id: "Screenshots", icon: Icons.screenshot },
+  { id: "Downloads", icon: Icons.download },
+  { id: "Clipboard", icon: Icons.clipboard },
+  { id: "Snippets", icon: Icons.pin },
+];
 
 const TAB_DATA: Record<string, { icon: "img" | "file" | "text"; name: string; sub: string }[]> = {
   Screenshots: [
@@ -193,10 +198,10 @@ const TAB_DATA: Record<string, { icon: "img" | "file" | "text"; name: string; su
 };
 
 const ANNOTATIONS = [
-  { id: "close", x: 85, y: 10, label: "Close & quit cleanly", lineX: 72, lineY: 17 },
-  { id: "tabs",  x: -130, y: 36, label: "4 tabs: Scrn / Down / Clip / Snip", lineX: 20, lineY: 42 },
-  { id: "drag",  x: 90, y: 55, label: "Drag files out to any app", lineX: 72, lineY: 62 },
-  { id: "copy",  x: 90, y: 78, label: "Click to copy to clipboard", lineX: 72, lineY: 84 },
+  { id: "close", x: 60, y: 0, label: "Close & quit cleanly", lineX: 92, lineY: 6 },
+  { id: "tabs",  x: -120, y: 0, label: "4 tabs: Scrn / Down / Clip / Snip", lineX: 20, lineY: 18 },
+  { id: "drag",  x: 100, y: 0, label: "Drag files out to any app", lineX: 70, lineY: 90 },
+  { id: "copy",  x: 100, y: 0, label: "Click to copy to clipboard", lineX: 85, lineY: 45 },
 ];
 
 function WidgetPreview() {
@@ -230,17 +235,18 @@ function WidgetPreview() {
         <div className="wc-tabs">
           {TABS.map((t) => (
             <button
-              key={t}
-              className={`wc-tab ${activeTab === t ? "active" : ""}`}
-              onClick={() => setActiveTab(t)}
+              key={t.id}
+              className={`wc-tab ${activeTab === t.id ? "active" : ""}`}
+              onClick={() => setActiveTab(t.id)}
+              title={t.id}
             >
-              {t.slice(0, 4)}
+              {t.icon}
             </button>
           ))}
         </div>
 
         {/* Items */}
-        <div className="wc-list">
+        <div className="wc-list" style={{ minHeight: "235px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
           {items.map((item, i) => (
             <div className="wc-item" key={i}>
               <span className="wc-item-icon">
