@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(1, 1, 1, 1) # Tiny margin to avoid clipping bounds
 
         self._card = QFrame()
-        self._card.setStyleSheet("QFrame { background-color: #1A1A1A; border-radius: 14px; border: 1px solid #2E2E2E; }")
+        self._card.setStyleSheet("QFrame { background-color: #1A1A1A; border-radius: 14px; border: none; }")
         card_layout = QVBoxLayout(self._card)
         card_layout.setContentsMargins(14, 10, 14, 12)
         card_layout.setSpacing(8)
