@@ -264,8 +264,8 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.toggle_visibility)
 
         def listen():
-            # New shortcut: Ctrl+Shift+Space (avoids Windows Alt+Space conflict)
-            with keyboard.GlobalHotKeys({'<ctrl>+<shift>+space': on_activate}) as h:
+            # New shortcut: Alt+X (fast, 2 keys, minimal conflicts)
+            with keyboard.GlobalHotKeys({'<alt>+x': on_activate}) as h:
                 h.join()
         
         self.hotkey_thread = threading.Thread(target=listen, daemon=True)
@@ -355,7 +355,7 @@ class MainWindow(QMainWindow):
         logo = QLabel("snag.")
         logo.setStyleSheet("color:#C8C8C8; font-size:13px; font-weight:700; letter-spacing:1px;")
         
-        hotkey_hint = QLabel("(Ctrl+Shift+Space to toggle)")
+        hotkey_hint = QLabel("(Alt+X to toggle)")
         hotkey_hint.setStyleSheet("color:#555555; font-size:10px; margin-left: 6px;")
         
         btn_close = QPushButton()
