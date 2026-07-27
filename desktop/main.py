@@ -19,6 +19,7 @@ APP_DIR        = os.path.expanduser("~/.config/snag")
 LICENSE_FILE   = os.path.join(APP_DIR, "license.json")
 SNIPPETS_FILE  = os.path.join(APP_DIR, "snippets.json")
 CLIPBOARD_FILE = os.path.join(APP_DIR, "clipboard_history.json")
+ASSETS_FILE    = os.path.join(APP_DIR, "assets.json")
 SVG_DIR        = os.path.join(APP_DIR, "svgs")
 WINDOW_WIDTH   = 340
 WINDOW_HEIGHT  = 480
@@ -34,6 +35,8 @@ SVGS = {
     "tab_clip_active": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>''',
     "tab_snip": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>''',
     "tab_snip_active": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>''',
+    "tab_asset": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>''',
+    "tab_asset_active": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>''',
     "item_img": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>''',
     "item_file": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>''',
     "item_text": '''<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>''',
@@ -224,7 +227,30 @@ class SnagList(QListWidget):
         else: mime.setText(data["text"])
         drag = QDrag(self)
         drag.setMimeData(mime)
+        
+        pixmap = self.itemWidget(item).grab()
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(pixmap.width() // 2, pixmap.height() // 2))
+        
         drag.exec(Qt.DropAction.CopyAction)
+
+class AssetList(SnagList):
+    def __init__(self, add_cb):
+        super().__init__(is_file_list=True)
+        self.add_cb = add_cb
+        self.setAcceptDrops(True)
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls(): event.acceptProposedAction()
+        else: super().dragEnterEvent(event)
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls(): event.acceptProposedAction()
+        else: super().dragMoveEvent(event)
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            for url in urls:
+                if url.isLocalFile(): self.add_cb(url.toLocalFile())
+            event.acceptProposedAction()
 
 class DirWatcher(FileSystemEventHandler):
     def __init__(self, cb): self.cb = cb
@@ -238,8 +264,10 @@ class MainWindow(QMainWindow):
         self.internal_copy_text = None
         self.snippets: list[str] = []
         self.clipboard_history: list[str] = []
+        self.assets: list[str] = []
 
         self._load_snippets()
+        self._load_assets()
         self._load_clipboard_history()
 
         self._qt_clipboard = QGuiApplication.clipboard()
@@ -299,6 +327,29 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         event.ignore()
         self.hide()
+
+    def _upload_asset(self):
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Asset")
+        if file_path:
+            self._add_asset(file_path)
+
+    def _load_assets(self):
+        try:
+            with open(ASSETS_FILE, "r") as f:
+                self.assets = json.load(f)
+        except:
+            self.assets = []
+
+    def _save_assets(self):
+        with open(ASSETS_FILE, "w") as f:
+            json.dump(self.assets, f)
+
+    def _add_asset(self, file_path):
+        if file_path not in self.assets:
+            self.assets.insert(0, file_path)
+            self._save_assets()
+            self._refresh_file_lists()
 
     def _load_snippets(self):
         try:
@@ -432,7 +483,7 @@ class MainWindow(QMainWindow):
         tab_bar = QHBoxLayout()
         tab_bar.setSpacing(8)
         self._tab_btns: list[QPushButton] = []
-        tab_ids = ["scrn", "down", "clip", "snip"]
+        tab_ids = ["scrn", "down", "clip", "snip", "asset"]
 
         for i, tid in enumerate(tab_ids):
             btn = QPushButton()
@@ -478,6 +529,21 @@ class MainWindow(QMainWindow):
         snip_layout.addWidget(self._list_snippets)
         self._pages.addWidget(snip_page)
 
+        # Assets page
+        asset_page = QWidget()
+        asset_layout = QVBoxLayout(asset_page)
+        asset_layout.setContentsMargins(0, 0, 0, 0)
+        
+        btn_add_asset = QPushButton("  Upload / Pin File")
+        btn_add_asset.setIcon(get_icon("item_file"))
+        btn_add_asset.setStyleSheet("QPushButton { background: #2A2A2A; color: #E0E0E0; border: none; border-radius: 6px; padding: 10px; margin: 4px; font-weight: bold; font-size: 11px; } QPushButton:hover { background: #383838; }")
+        btn_add_asset.clicked.connect(self._upload_asset)
+        asset_layout.addWidget(btn_add_asset)
+        
+        self._list_assets = AssetList(self._add_asset)
+        asset_layout.addWidget(self._list_assets)
+        self._pages.addWidget(asset_page)
+
         parent_layout.addWidget(self._pages)
         
         bottom_hint = QLabel("(Alt+X to toggle)")
@@ -492,7 +558,7 @@ class MainWindow(QMainWindow):
 
     def _switch_tab(self, index: int, animate=True):
         for i, btn in enumerate(self._tab_btns):
-            tid = ["scrn", "down", "clip", "snip"][i]
+            tid = ["scrn", "down", "clip", "snip", "asset"][i]
             btn.setChecked(i == index)
             btn.setIcon(get_icon(f"tab_{tid}_active" if i == index else f"tab_{tid}"))
             
@@ -518,6 +584,12 @@ class MainWindow(QMainWindow):
 
     def _refresh_file_lists(self):
         if not hasattr(self, "_list_downloads"): return
+        
+        self._list_assets.clear()
+        for f in self.assets:
+            if os.path.exists(f):
+                self._add_item_row(self._list_assets, os.path.basename(f), "Pinned Asset", "item_file", file_path=f)
+                
         self._list_downloads.clear()
         for f in self._get_recent_files(os.path.expanduser("~/Downloads")):
             self._add_item_row(self._list_downloads, os.path.basename(f), "Recently Added", "item_file", file_path=f)
