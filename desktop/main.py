@@ -6,7 +6,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QStackedWidget, QFrame,
-                             QLineEdit, QListWidget, QListWidgetItem, QGraphicsOpacityEffect)
+                             QLineEdit, QListWidget, QListWidgetItem)
 from PyQt6.QtCore import (Qt, QPoint, QSize, QUrl, QTimer, pyqtSignal, QMimeData,
                           QPropertyAnimation, QVariantAnimation, QEasingCurve, pyqtProperty)
 from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap
@@ -120,8 +120,7 @@ class UniversalRowWidget(QWidget):
         else:
             self.drag_hint = QLabel()
             self.drag_hint.setPixmap(get_pixmap("drag", 14))
-            self.drag_hint.setGraphicsEffect(QGraphicsOpacityEffect(self))
-            self.drag_hint.graphicsEffect().setOpacity(0.0)
+            self.drag_hint.hide()
             self.inner_layout.addWidget(self.drag_hint)
 
         self.layout.addWidget(self.inner_widget)
@@ -140,8 +139,8 @@ class UniversalRowWidget(QWidget):
         if hasattr(self, 'btn_reveal'):
             self.btn_reveal.show()
         elif hasattr(self, 'drag_hint'):
-            self.drag_hint.graphicsEffect().setOpacity(1.0)
             self.drag_hint.setPixmap(get_pixmap("drag_hover", 14))
+            self.drag_hint.show()
 
         self.anim.stop()
         self.anim.setStartValue(self.inner_layout.contentsMargins().left())
@@ -154,7 +153,7 @@ class UniversalRowWidget(QWidget):
         if hasattr(self, 'btn_reveal'):
             self.btn_reveal.hide()
         elif hasattr(self, 'drag_hint'):
-            self.drag_hint.graphicsEffect().setOpacity(0.0)
+            self.drag_hint.hide()
 
         self.anim.stop()
         self.anim.setStartValue(self.inner_layout.contentsMargins().left())
@@ -280,10 +279,13 @@ class MainWindow(QMainWindow):
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(screen.width() - WINDOW_WIDTH - 20, screen.height() - WINDOW_HEIGHT - 20)
 
+        self.setStyleSheet("QMainWindow { background: transparent; border: none; }")
+
         root = QWidget(self)
+        root.setStyleSheet("QWidget { background: transparent; border: none; }")
         self.setCentralWidget(root)
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setContentsMargins(1, 1, 1, 1) # Tiny margin to avoid clipping bounds
 
         self._card = QFrame()
         self._card.setStyleSheet("QFrame { background-color: #1A1A1A; border-radius: 14px; border: 1px solid #2E2E2E; }")
@@ -376,14 +378,6 @@ class MainWindow(QMainWindow):
         parent_layout.addLayout(tab_bar)
 
         self._pages = QStackedWidget()
-        
-        # Smooth Fade Animation Setup for QStackedWidget
-        self.fade_anim = QVariantAnimation(self)
-        self.fade_anim.setDuration(120)
-        self.fade_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
-        self.fade_anim.valueChanged.connect(self._update_opacity)
-        self.opacity_effect = QGraphicsOpacityEffect(self._pages)
-        self._pages.setGraphicsEffect(self.opacity_effect)
 
         self._list_screenshots = SnagList(is_file_list=True)
         self._list_screenshots.copy_requested.connect(self.copy_to_clipboard)
@@ -424,24 +418,7 @@ class MainWindow(QMainWindow):
             btn.setChecked(i == index)
             btn.setIcon(get_icon(f"tab_{tid}_active" if i == index else f"tab_{tid}"))
             
-        if animate:
-            self.next_index = index
-            self.fade_anim.stop()
-            self.fade_anim.setStartValue(1.0)
-            self.fade_anim.setEndValue(0.0)
-            self.fade_anim.start()
-        else:
-            self._pages.setCurrentIndex(index)
-            self.opacity_effect.setOpacity(1.0)
-
-    def _update_opacity(self, value):
-        self.opacity_effect.setOpacity(value)
-        if value == 0.0:
-            self._pages.setCurrentIndex(self.next_index)
-            self.fade_anim.stop()
-            self.fade_anim.setStartValue(0.0)
-            self.fade_anim.setEndValue(1.0)
-            self.fade_anim.start()
+        self._pages.setCurrentIndex(index)
 
     def _get_recent_files(self, directory: str, count: int = 10) -> list[str]:
         if not os.path.exists(directory): return []
