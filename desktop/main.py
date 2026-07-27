@@ -4,453 +4,583 @@ import json
 import subprocess
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QStackedWidget, QFrame,
-                             QLineEdit, QListWidget, QListWidgetItem, QAbstractItemView)
-from PyQt6.QtCore import Qt, QPoint, QSize, QUrl, QTimer, pyqtSignal, QObject, QMimeData
-from PyQt6.QtGui import QColor, QFont, QDrag, QCursor, QGuiApplication
+                             QLineEdit, QListWidget, QListWidgetItem, QScrollArea)
+from PyQt6.QtCore import Qt, QPoint, QSize, QUrl, QTimer, pyqtSignal, QMimeData
+from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QPalette, QColor
 
-# --- Configurations ---
-APP_DIR = os.path.expanduser("~/.config/snag")
-LICENSE_FILE = os.path.join(APP_DIR, "license.json")
-SNIPPETS_FILE = os.path.join(APP_DIR, "snippets.json")
-WINDOW_WIDTH = 340
-WINDOW_HEIGHT = 480
+# ─── Config ───────────────────────────────────────────────────────────────────
+APP_DIR        = os.path.expanduser("~/.config/snag")
+LICENSE_FILE   = os.path.join(APP_DIR, "license.json")
+SNIPPETS_FILE  = os.path.join(APP_DIR, "snippets.json")
+CLIPBOARD_FILE = os.path.join(APP_DIR, "clipboard_history.json")
+WINDOW_WIDTH   = 340
+WINDOW_HEIGHT  = 480
 
-def reveal_in_finder(file_path: str):
-    if os.path.exists(file_path):
-        if sys.platform == 'darwin':
-            subprocess.run(["open", "-R", file_path])
-        elif sys.platform == 'win32':
-            subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
+# ─── Cross-platform file helpers ─────────────────────────────────────────────
+def reveal_in_explorer(file_path: str):
+    if not os.path.exists(file_path):
+        return
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", file_path])
+    elif sys.platform == "win32":
+        subprocess.Popen(["explorer", "/select,", os.path.normpath(file_path)])
+    else:  # Linux: open parent dir
+        subprocess.Popen(["xdg-open", os.path.dirname(file_path)])
 
 def open_file(file_path: str):
-    if os.path.exists(file_path):
-        if sys.platform == 'darwin':
-            subprocess.run(["open", file_path])
-        elif sys.platform == 'win32':
-            os.startfile(file_path)
+    if not os.path.exists(file_path):
+        return
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", file_path])
+    elif sys.platform == "win32":
+        os.startfile(os.path.normpath(file_path))
+    else:
+        subprocess.Popen(["xdg-open", file_path])
 
-class FileItemWidget(QWidget):
-    def __init__(self, text, file_path, parent_list):
+
+# ─── File Row Widget (hover → reveal button appears) ─────────────────────────
+class FileRowWidget(QWidget):
+    revealed = pyqtSignal()
+
+    def __init__(self, filename: str, file_path: str):
         super().__init__()
         self.file_path = file_path
-        self.parent_list = parent_list
-        
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("background: transparent;")
+
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        
-        self.label = QLabel(text)
-        self.label.setStyleSheet("color: #E0E0E0; font-size: 13px; background: transparent;")
-        
-        self.btn_reveal = QPushButton("📁")
-        self.btn_reveal.setFixedSize(24, 24)
+        layout.setContentsMargins(10, 8, 6, 8)
+        layout.setSpacing(6)
+
+        # Icon label based on extension
+        ext = os.path.splitext(filename)[1].lower()
+        icon = "🖼" if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp") else "📄"
+        icon_lbl = QLabel(icon)
+        icon_lbl.setStyleSheet("font-size:14px; background: transparent;")
+        icon_lbl.setFixedWidth(20)
+
+        self.name_lbl = QLabel(filename)
+        self.name_lbl.setStyleSheet(
+            "color: #E0E0E0; font-size: 12px; background: transparent;"
+        )
+        self.name_lbl.setWordWrap(False)
+
+        self.btn_reveal = QPushButton("⇱")
+        self.btn_reveal.setToolTip("Reveal in Explorer / Finder")
+        self.btn_reveal.setFixedSize(26, 26)
         self.btn_reveal.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_reveal.setStyleSheet("""
-            QPushButton { background: transparent; border: none; font-size: 14px; }
-            QPushButton:hover { background: #333; border-radius: 4px; }
+            QPushButton {
+                background: #2A2A2A;
+                color: #AAAAAA;
+                border: 1px solid #444;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+            QPushButton:hover { background: #3A3A3A; color: #FFFFFF; }
         """)
         self.btn_reveal.hide()
-        self.btn_reveal.clicked.connect(self.on_reveal)
-        
-        layout.addWidget(self.label)
-        layout.addStretch()
+        self.btn_reveal.clicked.connect(lambda: reveal_in_explorer(self.file_path))
+
+        layout.addWidget(icon_lbl)
+        layout.addWidget(self.name_lbl, 1)
         layout.addWidget(self.btn_reveal)
-        
-    def on_reveal(self):
-        reveal_in_finder(self.file_path)
-        
+
     def enterEvent(self, event):
         self.btn_reveal.show()
+        self.setStyleSheet("background: #262626; border-radius: 6px;")
         super().enterEvent(event)
-        
+
     def leaveEvent(self, event):
         self.btn_reveal.hide()
+        self.setStyleSheet("background: transparent;")
         super().leaveEvent(event)
 
-class DraggableListWidget(QListWidget):
-    item_single_clicked = pyqtSignal(str)
-    
-    def __init__(self, is_file_list=False):
+
+# ─── Draggable List ────────────────────────────────────────────────────────────
+class SnagList(QListWidget):
+    copy_requested = pyqtSignal(str)
+
+    def __init__(self, is_file_list: bool = False):
         super().__init__()
         self.is_file_list = is_file_list
         self.setDragEnabled(True)
+        self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setStyleSheet("""
             QListWidget {
-                background-color: transparent;
+                background: transparent;
                 border: none;
                 outline: none;
             }
             QListWidget::item {
                 color: #E0E0E0;
-                padding: 10px;
-                background-color: #1A1A1A;
-                border-bottom: 1px solid #333333;
+                background: transparent;
+                border-bottom: 1px solid #2A2A2A;
+                padding: 0px;
+                min-height: 38px;
             }
-            QListWidget::item:hover {
-                background-color: #262626;
+            QListWidget::item:selected {
+                background: #2C2C2C;
                 border-radius: 6px;
             }
+            QScrollBar:vertical {
+                background: #1A1A1A;
+                width: 4px;
+                border-radius: 2px;
+            }
+            QScrollBar::handle:vertical {
+                background: #444;
+                border-radius: 2px;
+            }
         """)
-        self.itemClicked.connect(self.on_item_clicked)
-        if self.is_file_list:
-            self.itemDoubleClicked.connect(self.on_item_double_clicked)
+        self.itemClicked.connect(self._on_click)
+        if is_file_list:
+            self.itemDoubleClicked.connect(self._on_double_click)
 
-    def on_item_clicked(self, item):
+    def _on_click(self, item: QListWidgetItem):
         data = item.data(Qt.ItemDataRole.UserRole)
-        if data:
-            if data.get("type") == "file":
-                self.item_single_clicked.emit(data["path"])
-            else:
-                self.item_single_clicked.emit(data["text"])
-                
-    def on_item_double_clicked(self, item):
+        if not data:
+            return
+        if data["type"] == "file":
+            self.copy_requested.emit(data["path"])
+        else:
+            self.copy_requested.emit(data["text"])
+
+    def _on_double_click(self, item: QListWidgetItem):
         data = item.data(Qt.ItemDataRole.UserRole)
-        if data and data.get("type") == "file":
+        if data and data["type"] == "file":
             open_file(data["path"])
 
-    def startDrag(self, supportedActions):
+    def startDrag(self, supported_actions):
         item = self.currentItem()
-        if not item: return
-        
-        drag = QDrag(self)
-        mimeData = QMimeData()
+        if not item:
+            return
         data = item.data(Qt.ItemDataRole.UserRole)
-        
-        if data and data.get("type") == "file":
-            url = QUrl.fromLocalFile(data["path"])
-            mimeData.setUrls([url])
+        if not data:
+            return
+        mime = QMimeData()
+        if data["type"] == "file":
+            mime.setUrls([QUrl.fromLocalFile(data["path"])])
         else:
-            mimeData.setText(data["text"])
-            
-        drag.setMimeData(mimeData)
+            mime.setText(data["text"])
+        drag = QDrag(self)
+        drag.setMimeData(mime)
         drag.exec(Qt.DropAction.CopyAction)
 
 
-class WatchdogHandler(FileSystemEventHandler):
-    def __init__(self, callback):
-        self.callback = callback
+# ─── Watchdog ─────────────────────────────────────────────────────────────────
+class DirWatcher(FileSystemEventHandler):
+    def __init__(self, cb):
+        self.cb = cb
     def on_any_event(self, event):
-        self.callback()
+        self.cb()
 
+
+# ─── Main Window ──────────────────────────────────────────────────────────────
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.internal_copy_text = None
-        self.clipboard_history = []
-        self.snippets = []
-        
-        self.clipboard = QGuiApplication.clipboard()
-        self.clipboard.dataChanged.connect(self.handle_clipboard_change)
-        
-        self.load_snippets()
-        self.initUI()
-        self.setup_watchers()
-        
-    def copy_text_to_clipboard(self, text: str):
-        """Call this whenever the user clicks any row in Snag to copy."""
-        self.internal_copy_text = text
-        self.clipboard.setText(text)
-        self.show_toast("✓ Copied")
+        self.snippets: list[str] = []
+        self.clipboard_history: list[str] = []
 
-    def handle_clipboard_change(self):
-        new_text = self.clipboard.text().strip()
+        os.makedirs(APP_DIR, exist_ok=True)
+        self._load_snippets()
+        self._load_clipboard_history()   # ← persists across restarts
+
+        # Native Qt clipboard watcher
+        self._qt_clipboard = QGuiApplication.clipboard()
+        self._qt_clipboard.dataChanged.connect(self._on_clipboard_change)
+
+        self._build_ui()
+        self._start_watchers()
+
+    # ── Persistence ───────────────────────────────────────────────────────────
+    def _load_snippets(self):
+        try:
+            with open(SNIPPETS_FILE, "r", encoding="utf-8") as f:
+                self.snippets = json.load(f)
+        except Exception:
+            self.snippets = []
+
+    def _save_snippets(self):
+        with open(SNIPPETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.snippets, f, ensure_ascii=False)
+
+    def _load_clipboard_history(self):
+        """Load saved clipboard history so it survives restarts."""
+        try:
+            with open(CLIPBOARD_FILE, "r", encoding="utf-8") as f:
+                self.clipboard_history = json.load(f)
+        except Exception:
+            self.clipboard_history = []
+
+    def _save_clipboard_history(self):
+        with open(CLIPBOARD_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.clipboard_history, f, ensure_ascii=False)
+
+    # ── Clipboard logic ───────────────────────────────────────────────────────
+    def copy_to_clipboard(self, text: str):
+        """Copies text and flags it as internal so we don't re-add it."""
+        self.internal_copy_text = text
+        self._qt_clipboard.setText(text)
+        self._show_toast("✓ Copied")
+
+    def _on_clipboard_change(self):
+        new_text = self._qt_clipboard.text().strip()
         if not new_text:
             return
-
+        # Ignore copies triggered by Snag itself
         if new_text == self.internal_copy_text:
             self.internal_copy_text = None
             return
-
+        # Ignore duplicate at top
         if self.clipboard_history and self.clipboard_history[0] == new_text:
             return
-
         self.clipboard_history.insert(0, new_text)
         if len(self.clipboard_history) > 15:
             self.clipboard_history.pop()
-        self.update_clipboard_list()
-        
-    def show_toast(self, message: str):
-        self.toast_label.setText(message)
-        self.toast_label.show()
-        QTimer.singleShot(1500, self.toast_label.hide)
+        self._save_clipboard_history()
+        self._refresh_clipboard_ui()
 
-    def setup_watchers(self):
+    # ── Watchers ──────────────────────────────────────────────────────────────
+    def _start_watchers(self):
         self.observer = Observer()
-        self.watchdog_handler = WatchdogHandler(self.refresh_files)
-        paths_to_watch = [
+        handler = DirWatcher(lambda: QTimer.singleShot(0, self._refresh_file_lists))
+        for p in [
             os.path.expanduser("~/Downloads"),
             os.path.expanduser("~/Desktop"),
-            os.path.expanduser("~/Pictures/Screenshots")
-        ]
-        for p in paths_to_watch:
+            os.path.expanduser("~/Pictures/Screenshots"),
+        ]:
             if os.path.exists(p):
-                self.observer.schedule(self.watchdog_handler, p, recursive=False)
+                self.observer.schedule(handler, p, recursive=False)
         self.observer.start()
 
-    def refresh_files(self):
-        QTimer.singleShot(0, self.update_file_lists)
+    # ── Toast ─────────────────────────────────────────────────────────────────
+    def _show_toast(self, msg: str):
+        self._toast.setText(msg)
+        self._toast.show()
+        QTimer.singleShot(1500, self._toast.hide)
 
-    def load_snippets(self):
-        os.makedirs(APP_DIR, exist_ok=True)
-        if os.path.exists(SNIPPETS_FILE):
-            try:
-                with open(SNIPPETS_FILE, 'r') as f:
-                    self.snippets = json.load(f)
-            except:
-                self.snippets = []
-
-    def save_snippets(self):
-        with open(SNIPPETS_FILE, 'w') as f:
-            json.dump(self.snippets, f)
-
-    def initUI(self):
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+    # ══════════════════════════════════════════════════════════════════════════
+    #  UI BUILD
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_ui(self):
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
-        
+
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(screen.width() - WINDOW_WIDTH - 20, screen.height() - WINDOW_HEIGHT - 20)
 
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        self.main_layout = QVBoxLayout(self.central_widget)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.bg_container = QFrame()
-        self.bg_container.setStyleSheet("""
+        root = QWidget(self)
+        self.setCentralWidget(root)
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Card background
+        self._card = QFrame()
+        self._card.setStyleSheet("""
             QFrame {
                 background-color: #1A1A1A;
-                border-radius: 12px;
-                border: 1px solid #333333;
+                border-radius: 14px;
+                border: 1px solid #2E2E2E;
             }
         """)
-        self.bg_layout = QVBoxLayout(self.bg_container)
-        self.bg_layout.setContentsMargins(15, 15, 15, 15)
-        self.main_layout.addWidget(self.bg_container)
-        
-        # Header (Close Button)
-        self.header_top = QHBoxLayout()
-        self.header_top.setContentsMargins(0,0,0,0)
-        self.header_top.addStretch()
-        self.btn_close = QPushButton("✕")
-        self.btn_close.setFixedSize(24, 24)
-        self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_close.setStyleSheet("""
-            QPushButton { background: transparent; color: #808080; border: none; font-weight: bold; font-size: 14px; border-radius: 12px; }
-            QPushButton:hover { color: #FFFFFF; background-color: #FF5555; }
+        card_layout = QVBoxLayout(self._card)
+        card_layout.setContentsMargins(14, 10, 14, 12)
+        card_layout.setSpacing(8)
+        root_layout.addWidget(self._card)
+
+        # ── Top bar: logo + close ────────────────────────────────────────────
+        top_bar = QHBoxLayout()
+        logo = QLabel("snag.")
+        logo.setStyleSheet("color:#C8C8C8; font-size:13px; font-weight:700; letter-spacing:1px;")
+        btn_close = QPushButton("✕")
+        btn_close.setFixedSize(22, 22)
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setStyleSheet("""
+            QPushButton { background:transparent; color:#666; border:none; font-size:13px; border-radius:11px; }
+            QPushButton:hover { color:#fff; background:#E05050; }
         """)
-        self.btn_close.clicked.connect(self.close_app)
-        self.header_top.addWidget(self.btn_close)
-        self.bg_layout.addLayout(self.header_top)
-        
-        if not self.check_license():
-            self.show_licensing_gate()
+        btn_close.clicked.connect(self._quit)
+        top_bar.addWidget(logo)
+        top_bar.addStretch()
+        top_bar.addWidget(btn_close)
+        card_layout.addLayout(top_bar)
+
+        # ── License gate OR main content ─────────────────────────────────────
+        if not self._is_licensed():
+            self._build_license_gate(card_layout)
         else:
-            self.show_main_interface()
-            
-        # Toast Indicator Overlay
-        self.toast_label = QLabel(self)
-        self.toast_label.setStyleSheet("""
+            self._build_main(card_layout)
+
+        # ── Toast overlay ─────────────────────────────────────────────────────
+        self._toast = QLabel(self)
+        self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._toast.setStyleSheet("""
             QLabel {
-                background-color: #333333;
-                color: #FFFFFF;
+                background: #2E2E2E;
+                color: #DDDDDD;
+                border: 1px solid #444;
                 border-radius: 8px;
-                padding: 4px 12px;
-                font-size: 12px;
-                font-weight: bold;
+                padding: 4px 14px;
+                font-size: 11px;
+                font-weight: 600;
             }
         """)
-        self.toast_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.toast_label.hide()
-        # Position toast near the bottom center of the window
-        self.toast_label.resize(100, 26)
-        self.toast_label.move((WINDOW_WIDTH - 100) // 2, WINDOW_HEIGHT - 50)
+        self._toast.resize(110, 26)
+        self._toast.move((WINDOW_WIDTH - 110) // 2, WINDOW_HEIGHT - 44)
+        self._toast.hide()
 
-    def check_license(self):
-        if not os.path.exists(APP_DIR):
-            os.makedirs(APP_DIR, exist_ok=True)
-        if os.path.exists(LICENSE_FILE):
-            try:
-                with open(LICENSE_FILE, 'r') as f:
-                    data = json.load(f)
-                    return data.get("is_active", False)
-            except:
-                return False
-        return False
+    # ── License ───────────────────────────────────────────────────────────────
+    def _is_licensed(self) -> bool:
+        try:
+            with open(LICENSE_FILE, "r") as f:
+                return json.load(f).get("is_active", False)
+        except Exception:
+            return False
 
-    def close_app(self):
-        if hasattr(self, 'observer'):
+    def _build_license_gate(self, parent_layout):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(12)
+
+        title = QLabel("Activate Snag")
+        title.setStyleSheet("color:#E0E0E0; font-size:22px; font-weight:700;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        sub = QLabel("Enter your license key to unlock")
+        sub.setStyleSheet("color:#666; font-size:12px;")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._key_input = QLineEdit()
+        self._key_input.setPlaceholderText("SNAG-XXXX-XXXX-XXXX")
+        self._key_input.setStyleSheet("""
+            QLineEdit { background:#0D0D0D; color:#E0E0E0; border:1px solid #333;
+                        border-radius:7px; padding:10px 12px; font-size:13px; letter-spacing:1px; }
+            QLineEdit:focus { border:1px solid #555; }
+        """)
+
+        btn = QPushButton("Activate")
+        btn.setStyleSheet("""
+            QPushButton { background:#E0E0E0; color:#111; border-radius:7px;
+                          padding:10px; font-weight:700; font-size:13px; }
+            QPushButton:hover { background:#fff; }
+        """)
+        btn.clicked.connect(self._activate)
+        self._key_input.returnPressed.connect(self._activate)
+
+        layout.addWidget(title)
+        layout.addWidget(sub)
+        layout.addSpacing(10)
+        layout.addWidget(self._key_input)
+        layout.addWidget(btn)
+        parent_layout.addWidget(container)
+        self._gate_widget = container
+
+    def _activate(self):
+        key = self._key_input.text().strip()
+        if len(key) >= 16:
+            with open(LICENSE_FILE, "w") as f:
+                json.dump({"is_active": True, "key": key}, f)
+            self._gate_widget.setParent(None)
+            self._build_main(self._card.layout())
+
+    # ── Main Interface ────────────────────────────────────────────────────────
+    def _build_main(self, parent_layout):
+        # ── Tab header ───────────────────────────────────────────────────────
+        tab_bar = QHBoxLayout()
+        tab_bar.setSpacing(0)
+        self._tab_btns: list[QPushButton] = []
+        tab_labels = ["Screenshots", "Downloads", "Clipboard", "Snippets"]
+        tab_short   = ["Scrn",       "Down",      "Clip",      "Snip"]
+
+        for i, (lbl, short) in enumerate(zip(tab_labels, tab_short)):
+            btn = QPushButton(short)
+            btn.setToolTip(lbl)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setCheckable(True)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background: transparent; color: #555; border: none;
+                    font-size: 12px; font-weight: 600; padding: 6px 8px;
+                    border-bottom: 2px solid transparent;
+                }
+                QPushButton:hover  { color: #AAA; }
+                QPushButton:checked { color: #E0E0E0; border-bottom: 2px solid #888; }
+            """)
+            btn.clicked.connect(lambda _, idx=i: self._switch_tab(idx))
+            self._tab_btns.append(btn)
+            tab_bar.addWidget(btn)
+        tab_bar.addStretch()
+        parent_layout.addLayout(tab_bar)
+
+        # ── Stacked pages ────────────────────────────────────────────────────
+        self._pages = QStackedWidget()
+
+        # Page 0: Screenshots
+        self._list_screenshots = SnagList(is_file_list=True)
+        self._list_screenshots.copy_requested.connect(self.copy_to_clipboard)
+        self._pages.addWidget(self._list_screenshots)
+
+        # Page 1: Downloads
+        self._list_downloads = SnagList(is_file_list=True)
+        self._list_downloads.copy_requested.connect(self.copy_to_clipboard)
+        self._pages.addWidget(self._list_downloads)
+
+        # Page 2: Clipboard
+        self._list_clipboard = SnagList()
+        self._list_clipboard.copy_requested.connect(self.copy_to_clipboard)
+        self._pages.addWidget(self._list_clipboard)
+
+        # Page 3: Snippets
+        snip_page = QWidget()
+        snip_layout = QVBoxLayout(snip_page)
+        snip_layout.setContentsMargins(0, 0, 0, 0)
+        snip_layout.setSpacing(6)
+
+        self._snip_input = QLineEdit()
+        self._snip_input.setPlaceholderText("Type a snippet and press Enter…")
+        self._snip_input.setStyleSheet("""
+            QLineEdit { background:#0D0D0D; color:#E0E0E0; border:1px solid #333;
+                        border-radius:7px; padding:8px 10px; font-size:12px; }
+            QLineEdit:focus { border:1px solid #555; }
+        """)
+        self._snip_input.returnPressed.connect(self._add_snippet)
+
+        self._list_snippets = SnagList()
+        self._list_snippets.copy_requested.connect(self.copy_to_clipboard)
+
+        snip_layout.addWidget(self._snip_input)
+        snip_layout.addWidget(self._list_snippets)
+        self._pages.addWidget(snip_page)
+
+        parent_layout.addWidget(self._pages)
+
+        self._switch_tab(0)
+        self._refresh_file_lists()
+        self._refresh_clipboard_ui()
+        self._refresh_snippets_ui()
+
+    def _switch_tab(self, index: int):
+        for i, btn in enumerate(self._tab_btns):
+            btn.setChecked(i == index)
+        self._pages.setCurrentIndex(index)
+
+    # ── File helpers ──────────────────────────────────────────────────────────
+    def _get_recent_files(self, directory: str, count: int = 10) -> list[str]:
+        if not os.path.exists(directory):
+            return []
+        files = [
+            os.path.join(directory, n)
+            for n in os.listdir(directory)
+            if os.path.isfile(os.path.join(directory, n))
+        ]
+        files.sort(key=os.path.getmtime, reverse=True)
+        return files[:count]
+
+    def _add_file_row(self, list_widget: SnagList, file_path: str):
+        item = QListWidgetItem()
+        item.setData(Qt.ItemDataRole.UserRole, {"type": "file", "path": file_path})
+
+        row = FileRowWidget(os.path.basename(file_path), file_path)
+        # Make sure the item height matches the widget
+        item.setSizeHint(QSize(WINDOW_WIDTH - 30, 42))
+        list_widget.addItem(item)
+        list_widget.setItemWidget(item, row)
+
+    def _refresh_file_lists(self):
+        if not hasattr(self, "_list_downloads"):
+            return
+
+        # Downloads
+        self._list_downloads.clear()
+        for f in self._get_recent_files(os.path.expanduser("~/Downloads")):
+            self._add_file_row(self._list_downloads, f)
+
+        # Screenshots (Desktop + Pictures/Screenshots, image files only)
+        sc_dirs = [
+            os.path.expanduser("~/Desktop"),
+            os.path.expanduser("~/Pictures/Screenshots"),
+        ]
+        images = []
+        for d in sc_dirs:
+            if os.path.exists(d):
+                images.extend([
+                    os.path.join(d, n) for n in os.listdir(d)
+                    if n.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
+                ])
+        images.sort(key=os.path.getmtime, reverse=True)
+        self._list_screenshots.clear()
+        for f in images[:10]:
+            self._add_file_row(self._list_screenshots, f)
+
+    # ── Clipboard UI ──────────────────────────────────────────────────────────
+    def _refresh_clipboard_ui(self):
+        if not hasattr(self, "_list_clipboard"):
+            return
+        self._list_clipboard.clear()
+        for text in self.clipboard_history:
+            preview = text.replace("\n", " ").strip()
+            if len(preview) > 52:
+                preview = preview[:52] + "…"
+            item = QListWidgetItem(preview)
+            item.setData(Qt.ItemDataRole.UserRole, {"type": "text", "text": text})
+            item.setForeground(QColor("#C8C8C8"))
+            self._list_clipboard.addItem(item)
+
+    # ── Snippets ──────────────────────────────────────────────────────────────
+    def _add_snippet(self):
+        text = self._snip_input.text().strip()
+        if text:
+            self.snippets.insert(0, text)
+            self._save_snippets()
+            self._refresh_snippets_ui()
+            self._snip_input.clear()
+
+    def _refresh_snippets_ui(self):
+        if not hasattr(self, "_list_snippets"):
+            return
+        self._list_snippets.clear()
+        for s in self.snippets:
+            item = QListWidgetItem(s[:54] + "…" if len(s) > 54 else s)
+            item.setData(Qt.ItemDataRole.UserRole, {"type": "text", "text": s})
+            item.setForeground(QColor("#C8C8C8"))
+            self._list_snippets.addItem(item)
+
+    # ── Cleanup ───────────────────────────────────────────────────────────────
+    def _quit(self):
+        if hasattr(self, "observer"):
             self.observer.stop()
             self.observer.join()
         QApplication.quit()
 
-    def show_licensing_gate(self):
-        gate_widget = QWidget()
-        layout = QVBoxLayout(gate_widget)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title = QLabel("Activate Snag")
-        title.setStyleSheet("color: #E0E0E0; font-size: 24px; font-weight: bold; font-family: 'SF Pro', sans-serif;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.key_input = QLineEdit()
-        self.key_input.setPlaceholderText("SNAG-XXXX-XXXX-XXXX")
-        self.key_input.setStyleSheet("QLineEdit { background: #0A0A0A; color: #E0E0E0; border: 1px solid #333333; border-radius: 6px; padding: 10px; font-size: 14px;} QLineEdit:focus { border: 1px solid #555555; }")
-        btn_activate = QPushButton("Activate")
-        btn_activate.setStyleSheet("QPushButton { background: #E0E0E0; color: #1A1A1A; border-radius: 6px; padding: 10px; font-weight: bold; margin-top: 10px; } QPushButton:hover { background: #FFFFFF; }")
-        btn_activate.clicked.connect(self.activate_license)
-        layout.addWidget(title)
-        layout.addWidget(self.key_input)
-        layout.addWidget(btn_activate)
-        self.bg_layout.addWidget(gate_widget)
-        self.current_view = gate_widget
-
-    def activate_license(self):
-        key = self.key_input.text().strip()
-        if len(key) >= 16:
-            with open(LICENSE_FILE, 'w') as f:
-                json.dump({"is_active": True, "key": key}, f)
-            self.current_view.setParent(None)
-            self.show_main_interface()
-
-    def show_main_interface(self):
-        main_widget = QWidget()
-        layout = QVBoxLayout(main_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(5)
-        tabs = ["Scrn", "Down", "Clip", "Snip"]
-        self.tab_buttons = []
-        for i, tab in enumerate(tabs):
-            btn = QPushButton(tab)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setStyleSheet("""
-                QPushButton { background: transparent; color: #808080; border: none; font-size: 13px; font-weight: bold; padding: 8px;}
-                QPushButton:hover { color: #E0E0E0; }
-                QPushButton:checked { color: #FFFFFF; border-bottom: 2px solid #FFFFFF; }
-            """)
-            btn.setCheckable(True)
-            btn.clicked.connect(lambda checked, idx=i: self.switch_tab(idx))
-            self.tab_buttons.append(btn)
-            header_layout.addWidget(btn)
-        
-        layout.addLayout(header_layout)
-        self.stacked_widget = QStackedWidget()
-        
-        self.list_screenshots = DraggableListWidget(is_file_list=True)
-        self.list_screenshots.item_single_clicked.connect(self.copy_text_to_clipboard)
-        self.stacked_widget.addWidget(self.list_screenshots)
-        
-        self.list_downloads = DraggableListWidget(is_file_list=True)
-        self.list_downloads.item_single_clicked.connect(self.copy_text_to_clipboard)
-        self.stacked_widget.addWidget(self.list_downloads)
-        
-        self.list_clipboard = DraggableListWidget()
-        self.list_clipboard.item_single_clicked.connect(self.copy_text_to_clipboard)
-        self.stacked_widget.addWidget(self.list_clipboard)
-        
-        snippet_widget = QWidget()
-        s_layout = QVBoxLayout(snippet_widget)
-        s_layout.setContentsMargins(0,0,0,0)
-        self.snippet_input = QLineEdit()
-        self.snippet_input.setPlaceholderText("Add a snippet...")
-        self.snippet_input.setStyleSheet("QLineEdit { background: #0A0A0A; color: #E0E0E0; border: 1px solid #333333; border-radius: 6px; padding: 8px; }")
-        self.snippet_input.returnPressed.connect(self.add_snippet)
-        s_layout.addWidget(self.snippet_input)
-        self.list_snippets = DraggableListWidget()
-        self.list_snippets.item_single_clicked.connect(self.copy_text_to_clipboard)
-        s_layout.addWidget(self.list_snippets)
-        self.stacked_widget.addWidget(snippet_widget)
-        
-        layout.addWidget(self.stacked_widget)
-        self.bg_layout.addWidget(main_widget)
-        self.current_view = main_widget
-        
-        self.switch_tab(0)
-        self.update_file_lists()
-        self.update_snippets_list()
-
-    def switch_tab(self, index):
-        for i, btn in enumerate(self.tab_buttons):
-            btn.setChecked(i == index)
-        self.stacked_widget.setCurrentIndex(index)
-
-    def get_latest_files(self, directory, count=10):
-        if not os.path.exists(directory): return []
-        files = [os.path.join(directory, f) for f in os.listdir(directory)]
-        files = [f for f in files if os.path.isfile(f)]
-        files.sort(key=os.path.getmtime, reverse=True)
-        return files[:count]
-
-    def add_file_item(self, list_widget, file_path):
-        item = QListWidgetItem(list_widget)
-        item.setData(Qt.ItemDataRole.UserRole, {"type": "file", "path": file_path})
-        
-        # We don't set text on the item directly to avoid double drawing,
-        # but the drag/drop uses text as a fallback if not using urls. 
-        # Actually it uses data["path"] so it's fine.
-        
-        widget = FileItemWidget(os.path.basename(file_path), file_path, list_widget)
-        item.setSizeHint(widget.sizeHint())
-        list_widget.setItemWidget(item, widget)
-
-    def update_file_lists(self):
-        if not hasattr(self, 'list_downloads'): return
-        
-        # Downloads
-        dl_dir = os.path.expanduser("~/Downloads")
-        self.list_downloads.clear()
-        for f in self.get_latest_files(dl_dir):
-            self.add_file_item(self.list_downloads, f)
-            
-        # Screenshots
-        sc_dirs = [os.path.expanduser("~/Desktop"), os.path.expanduser("~/Pictures/Screenshots")]
-        all_sc = []
-        for d in sc_dirs:
-            if os.path.exists(d):
-                all_sc.extend([os.path.join(d, f) for f in os.listdir(d) if "screenshot" in f.lower() or f.endswith(('.png', '.jpg'))])
-        all_sc.sort(key=os.path.getmtime, reverse=True)
-        self.list_screenshots.clear()
-        for f in all_sc[:10]:
-            self.add_file_item(self.list_screenshots, f)
-
-    def update_clipboard_list(self):
-        if not hasattr(self, 'list_clipboard'): return
-        self.list_clipboard.clear()
-        for t in self.clipboard_history:
-            item = QListWidgetItem(t.replace('\\n', ' ')[:50] + "...")
-            item.setData(Qt.ItemDataRole.UserRole, {"type": "text", "text": t})
-            self.list_clipboard.addItem(item)
-
-    def add_snippet(self):
-        text = self.snippet_input.text().strip()
-        if text:
-            self.snippets.insert(0, text)
-            self.save_snippets()
-            self.update_snippets_list()
-            self.snippet_input.clear()
-
-    def update_snippets_list(self):
-        self.list_snippets.clear()
-        for s in self.snippets:
-            item = QListWidgetItem(s)
-            item.setData(Qt.ItemDataRole.UserRole, {"type": "text", "text": s})
-            self.list_snippets.addItem(item)
-
+    # ── Window drag ───────────────────────────────────────────────────────────
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.oldPos = event.globalPosition().toPoint()
+            self._drag_pos = event.globalPosition().toPoint()
 
     def mouseMoveEvent(self, event):
-        if hasattr(self, 'oldPos'):
-            delta = QPoint(event.globalPosition().toPoint() - self.oldPos)
+        if hasattr(self, "_drag_pos"):
+            delta = event.globalPosition().toPoint() - self._drag_pos
             self.move(self.x() + delta.x(), self.y() + delta.y())
-            self.oldPos = event.globalPosition().toPoint()
+            self._drag_pos = event.globalPosition().toPoint()
 
-if __name__ == '__main__':
+
+# ─── Entry ────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    font = QFont("SF Pro", 10)
-    app.setFont(font)
-    window = MainWindow()
-    window.show()
+    app.setFont(QFont("Segoe UI", 10))  # cross-platform font (SF Pro on macOS, Segoe UI on Windows)
+    win = MainWindow()
+    win.show()
     sys.exit(app.exec())
