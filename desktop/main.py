@@ -264,8 +264,8 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.toggle_visibility)
 
         def listen():
-            # Default shortcut: Alt+Space
-            with keyboard.GlobalHotKeys({'<alt>+<space>': on_activate}) as h:
+            # New shortcut: Ctrl+Shift+Space (avoids Windows Alt+Space conflict)
+            with keyboard.GlobalHotKeys({'<ctrl>+<shift>+space': on_activate}) as h:
                 h.join()
         
         self.hotkey_thread = threading.Thread(target=listen, daemon=True)
@@ -355,14 +355,18 @@ class MainWindow(QMainWindow):
         logo = QLabel("snag.")
         logo.setStyleSheet("color:#C8C8C8; font-size:13px; font-weight:700; letter-spacing:1px;")
         
+        hotkey_hint = QLabel("(Ctrl+Shift+Space to toggle)")
+        hotkey_hint.setStyleSheet("color:#555555; font-size:10px; margin-left: 6px;")
+        
         btn_close = QPushButton()
         btn_close.setIcon(get_icon("close"))
         btn_close.setFixedSize(22, 22)
         btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_close.setStyleSheet("QPushButton { background:transparent; border:none; border-radius:11px; } QPushButton:hover { background:#E05050; }")
-        btn_close.clicked.connect(self._quit)
+        btn_close.clicked.connect(self.hide)
         
         top_bar.addWidget(logo)
+        top_bar.addWidget(hotkey_hint)
         top_bar.addStretch()
         top_bar.addWidget(btn_close)
         card_layout.addLayout(top_bar)
