@@ -9,6 +9,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing license_key or device_id' }, { status: 400 });
     }
 
+    // Super Admin Bypass
+    if (license_key === 'SNAG-SUPER-ADMIN') {
+      return NextResponse.json({ success: true, message: 'Super Admin activated successfully.' }, { status: 200 });
+    }
+
     // 1. Fetch the license
     const { data: license, error } = await supabase
       .from('licenses')
