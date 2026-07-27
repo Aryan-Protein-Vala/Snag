@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QStackedWidget, QFrame,
                              QLineEdit, QListWidget, QListWidgetItem, QSystemTrayIcon, QMenu)
 from PyQt6.QtCore import (Qt, QPoint, QSize, QUrl, QTimer, pyqtSignal, QMimeData,
-                          QPropertyAnimation, QVariantAnimation, QEasingCurve, pyqtProperty)
-from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap, QAction
+                          QPropertyAnimation, QVariantAnimation, QEasingCurve, pyqtProperty, QRectF)
+from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap, QAction, QPainter, QBrush, QPen
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 APP_DIR        = os.path.expanduser("~/.config/snag")
@@ -54,6 +54,24 @@ def get_icon(name: str) -> QIcon:
 def get_pixmap(name: str, size: int = 14) -> QPixmap:
     icon = get_icon(name)
     return icon.pixmap(QSize(size, size))
+
+def create_app_icon() -> QIcon:
+    pixmap = QPixmap(64, 64)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    
+    painter.setBrush(QBrush(QColor("#111111")))
+    painter.setPen(QPen(QColor("#444444"), 3))
+    painter.drawRoundedRect(QRectF(4, 4, 56, 56), 12, 12)
+    
+    painter.setPen(QColor("#EBEBEB"))
+    font = QFont("Segoe UI", 26, QFont.Weight.Black)
+    painter.setFont(font)
+    painter.drawText(QRectF(4, 4, 56, 56), Qt.AlignmentFlag.AlignCenter, "S.")
+    
+    painter.end()
+    return QIcon(pixmap)
 
 # ─── Cross-platform file helpers ─────────────────────────────────────────────
 def reveal_in_explorer(file_path: str):
@@ -234,8 +252,7 @@ class MainWindow(QMainWindow):
 
     def _setup_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
-        # Using a generic Snag logo for the tray
-        self.tray_icon.setIcon(get_icon("tab_scrn")) 
+        self.tray_icon.setIcon(create_app_icon()) 
         
         tray_menu = QMenu()
         
@@ -557,6 +574,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setFont(QFont("Segoe UI", 10))
+    app.setWindowIcon(create_app_icon())
     win = MainWindow()
     win.show()
     sys.exit(app.exec())
