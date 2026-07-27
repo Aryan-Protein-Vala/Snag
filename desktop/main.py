@@ -355,9 +355,6 @@ class MainWindow(QMainWindow):
         logo = QLabel("snag.")
         logo.setStyleSheet("color:#C8C8C8; font-size:13px; font-weight:700; letter-spacing:1px;")
         
-        hotkey_hint = QLabel("(Alt+X to toggle)")
-        hotkey_hint.setStyleSheet("color:#555555; font-size:10px; margin-left: 6px;")
-        
         btn_close = QPushButton()
         btn_close.setIcon(get_icon("close"))
         btn_close.setFixedSize(22, 22)
@@ -366,7 +363,6 @@ class MainWindow(QMainWindow):
         btn_close.clicked.connect(self.hide)
         
         top_bar.addWidget(logo)
-        top_bar.addWidget(hotkey_hint)
         top_bar.addStretch()
         top_bar.addWidget(btn_close)
         card_layout.addLayout(top_bar)
@@ -466,6 +462,11 @@ class MainWindow(QMainWindow):
         self._pages.addWidget(snip_page)
 
         parent_layout.addWidget(self._pages)
+        
+        bottom_hint = QLabel("(Alt+X to toggle)")
+        bottom_hint.setStyleSheet("color:#555555; font-size:10px;")
+        bottom_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        parent_layout.addWidget(bottom_hint)
 
         self._switch_tab(0, animate=False)
         self._refresh_file_lists()
