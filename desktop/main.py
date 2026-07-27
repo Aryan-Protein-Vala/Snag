@@ -2,14 +2,17 @@ import sys
 import os
 import json
 import subprocess
+import threading
+from pynput import keyboard
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QStackedWidget, QFrame,
-                             QLineEdit, QListWidget, QListWidgetItem)
+                             QLineEdit, QListWidget, QListWidgetItem, QSystemTrayIcon, QMenu)
 from PyQt6.QtCore import (Qt, QPoint, QSize, QUrl, QTimer, pyqtSignal, QMimeData,
                           QPropertyAnimation, QVariantAnimation, QEasingCurve, pyqtProperty)
-from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap
+from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap, QAction
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 APP_DIR        = os.path.expanduser("~/.config/snag")
@@ -225,7 +228,60 @@ class MainWindow(QMainWindow):
         self._qt_clipboard.dataChanged.connect(self._on_clipboard_change)
 
         self._build_ui()
+        self._setup_tray()
         self._start_watchers()
+        self._start_hotkey_listener()
+
+    def _setup_tray(self):
+        self.tray_icon = QSystemTrayIcon(self)
+        # Using a generic Snag logo for the tray
+        self.tray_icon.setIcon(get_icon("tab_scrn")) 
+        
+        tray_menu = QMenu()
+        
+        # Tray styling
+        tray_menu.setStyleSheet("""
+            QMenu { background: #1A1A1A; border: 1px solid #333; color: #E0E0E0; border-radius: 6px; padding: 4px; }
+            QMenu::item { padding: 6px 20px; border-radius: 4px; }
+            QMenu::item:selected { background: #5ECC7B; color: #111; }
+        """)
+
+        show_action = QAction("Open Snag", self)
+        show_action.triggered.connect(self.toggle_visibility)
+        
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(self._quit)
+        
+        tray_menu.addAction(show_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
+
+    def _start_hotkey_listener(self):
+        def on_activate():
+            QTimer.singleShot(0, self.toggle_visibility)
+
+        def listen():
+            # Default shortcut: Alt+Space
+            with keyboard.GlobalHotKeys({'<alt>+<space>': on_activate}) as h:
+                h.join()
+        
+        self.hotkey_thread = threading.Thread(target=listen, daemon=True)
+        self.hotkey_thread.start()
+
+    def toggle_visibility(self):
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+
+    def closeEvent(self, event):
+        event.ignore()
+        self.hide()
 
     def _load_snippets(self):
         try:
@@ -494,6 +550,7 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     app.setFont(QFont("Segoe UI", 10))
     win = MainWindow()
     win.show()
