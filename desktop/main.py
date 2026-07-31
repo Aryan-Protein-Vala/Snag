@@ -753,7 +753,7 @@ class MainWindow(QMainWindow):
         for s in self.snippets:
             preview = s.replace("\n", " ").strip()
             if len(preview) > 42: preview = preview[:42] + "…"
-            self._add_item_row(self._list_snippets, preview, "Pinned snippet", "item_text", data_val=s)
+            self._add_item_row(self._list_snippets, preview, "Pinned snippet", "item_text", data_val=s, list_type="snippets")
 
     def _quit(self):
         if hasattr(self, "observer"):
