@@ -275,7 +275,7 @@ class SnagList(QListWidget):
         self.verticalScrollBar().setSingleStep(15)
         self.setStyleSheet("""
             QListWidget { background: transparent; border: none; outline: none; }
-            QListWidget::item { border-bottom: 1px solid #2A2A2A; padding: 0px; min-height: 48px; }
+            QListWidget::item { border-bottom: 1px solid #2A2A2A; padding: 0px; min-height: 54px; }
             QListWidget::item:selected { background: transparent; }
             QScrollBar:vertical { background: #1A1A1A; width: 4px; border-radius: 2px; }
             QScrollBar::handle:vertical { background: #444; border-radius: 2px; }
@@ -667,7 +667,7 @@ class MainWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, {"type": "text", "text": data_val})
 
         row = UniversalRowWidget(title, subtitle, icon_name, file_path, edit_cb=self._on_edit_item, data_ref=(file_path if file_path else data_val), list_type=list_type)
-        item.setSizeHint(QSize(WINDOW_WIDTH - 30, 48))
+        item.setSizeHint(QSize(WINDOW_WIDTH - 30, 54))
         list_widget.addItem(item)
         list_widget.setItemWidget(item, row)
 
