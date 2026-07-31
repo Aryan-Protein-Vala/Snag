@@ -196,6 +196,8 @@ class SnagList(QListWidget):
         self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.verticalScrollBar().setSingleStep(15)
         self.setStyleSheet("""
             QListWidget { background: transparent; border: none; outline: none; }
             QListWidget::item { border-bottom: 1px solid #2A2A2A; padding: 0px; min-height: 48px; }
