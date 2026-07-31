@@ -716,7 +716,12 @@ class MainWindow(QMainWindow):
         for f in self._get_recent_files(os.path.expanduser("~/Downloads")):
             if f not in self.hidden_files: self._add_item_row(self._list_downloads, os.path.basename(f), "Recently Added", "item_file", file_path=f, list_type="downloads")
 
-        sc_dirs = [os.path.expanduser("~/Desktop"), os.path.expanduser("~/Pictures/Screenshots")]
+        sc_dirs = [
+            os.path.expanduser("~/Desktop"), 
+            os.path.expanduser("~/Pictures/Screenshots"),
+            os.path.expanduser("~/OneDrive/Desktop"),
+            os.path.expanduser("~/OneDrive/Pictures/Screenshots")
+        ]
         images = []
         for d in sc_dirs:
             if os.path.exists(d): images.extend([os.path.join(d, n) for n in os.listdir(d) if n.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))])
