@@ -306,6 +306,15 @@ class MainWindow(QMainWindow):
 
     def _start_hotkey_listener(self):
         def on_activate():
+            try:
+                # Force release Alt and X to prevent keys from getting "stuck" when focus is stolen
+                ctrl = keyboard.Controller()
+                ctrl.release(keyboard.Key.alt)
+                ctrl.release(keyboard.Key.alt_l)
+                ctrl.release(keyboard.Key.alt_r)
+                ctrl.release('x')
+            except Exception:
+                pass
             QTimer.singleShot(0, self.toggle_visibility)
 
         def listen():
