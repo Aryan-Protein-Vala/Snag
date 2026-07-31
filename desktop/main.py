@@ -9,10 +9,10 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QStackedWidget, QFrame,
-                             QLineEdit, QListWidget, QListWidgetItem, QSystemTrayIcon, QMenu)
+                             QLineEdit, QListWidget, QListWidgetItem, QSystemTrayIcon, QMenu, QDialog)
 from PyQt6.QtCore import (Qt, QPoint, QSize, QUrl, QTimer, pyqtSignal, QMimeData,
                           QPropertyAnimation, QVariantAnimation, QEasingCurve, pyqtProperty, QRectF)
-from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap, QAction, QPainter, QBrush, QPen
+from PyQt6.QtGui import QFont, QDrag, QGuiApplication, QColor, QIcon, QPixmap, QAction, QPainter, QBrush, QPen, QCursor
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 APP_DIR        = os.path.expanduser("~/.config/snag")
@@ -20,6 +20,7 @@ LICENSE_FILE   = os.path.join(APP_DIR, "license.json")
 SNIPPETS_FILE  = os.path.join(APP_DIR, "snippets.json")
 CLIPBOARD_FILE = os.path.join(APP_DIR, "clipboard_history.json")
 ASSETS_FILE    = os.path.join(APP_DIR, "assets.json")
+HIDDEN_FILE    = os.path.join(APP_DIR, "hidden.json")
 SVG_DIR        = os.path.join(APP_DIR, "svgs")
 WINDOW_WIDTH   = 340
 WINDOW_HEIGHT  = 480
@@ -91,10 +92,65 @@ def open_file(file_path: str):
 
 
 # ─── Universal Item Row (Smooth Bounce Animations + Icons) ───────────────────
+
+class EditDialog(QDialog):
+    def __init__(self, parent, title: str, allow_rename: bool = True):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.new_title = title
+        self.action = None
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        container = QWidget()
+        container.setStyleSheet("QWidget { background: #1A1A1A; border: 1px solid #333; border-radius: 8px; }")
+        clayout = QVBoxLayout(container)
+        clayout.setContentsMargins(12, 12, 12, 12)
+        clayout.setSpacing(10)
+        
+        self.input_edit = QLineEdit(title)
+        self.input_edit.setStyleSheet("QLineEdit { background: #0D0D0D; color: #E0E0E0; border: 1px solid #333; border-radius: 4px; padding: 6px; }")
+        if not allow_rename:
+            self.input_edit.setReadOnly(True)
+            self.input_edit.setStyleSheet("QLineEdit { background: #111; color: #888; border: 1px solid #222; border-radius: 4px; padding: 6px; }")
+        clayout.addWidget(self.input_edit)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(8)
+        
+        btn_delete = QPushButton("Delete")
+        btn_delete.setStyleSheet("QPushButton { background: #4A1A1A; color: #FF6B6B; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; } QPushButton:hover { background: #5A1A1A; }")
+        btn_delete.clicked.connect(self._on_delete)
+        btn_layout.addWidget(btn_delete)
+        
+        if allow_rename:
+            btn_save = QPushButton("Rename")
+            btn_save.setStyleSheet("QPushButton { background: #2A2A2A; color: #E0E0E0; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; } QPushButton:hover { background: #3A3A3A; }")
+            btn_save.clicked.connect(self._on_save)
+            self.input_edit.returnPressed.connect(self._on_save)
+            btn_layout.addWidget(btn_save)
+            
+        clayout.addLayout(btn_layout)
+        layout.addWidget(container)
+        
+    def _on_delete(self):
+        self.action = "delete"
+        self.accept()
+        
+    def _on_save(self):
+        self.action = "rename"
+        self.new_title = self.input_edit.text()
+        self.accept()
+
 class UniversalRowWidget(QWidget):
-    def __init__(self, title: str, subtitle: str, icon_name: str, file_path: str = None):
+    def __init__(self, title: str, subtitle: str, icon_name: str, file_path: str = None, edit_cb=None, data_ref=None, list_type=None):
         super().__init__()
         self.file_path = file_path
+        self.edit_cb = edit_cb
+        self.data_ref = data_ref
+        self.list_type = list_type
+        self.title_val = title
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet("background: transparent; border-radius: 6px;")
 
@@ -130,6 +186,16 @@ class UniversalRowWidget(QWidget):
         self.inner_layout.addStretch()
 
         # Hover Actions
+        
+        self.btn_edit = QPushButton("⋮")
+        self.btn_edit.setFixedSize(26, 26)
+        self.btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_edit.setStyleSheet("QPushButton { background: #2A2A2A; color: #AAA; border: 1px solid #444; border-radius: 5px; font-weight: bold; } QPushButton:hover { background: #3A3A3A; color: #FFF; }")
+        self.btn_edit.hide()
+        if self.edit_cb:
+            self.btn_edit.clicked.connect(lambda: self.edit_cb(self.list_type, self.data_ref, self.title_val))
+        self.inner_layout.addWidget(self.btn_edit)
+
         if self.file_path:
             self.btn_reveal = QPushButton("⇱")
             self.btn_reveal.setFixedSize(26, 26)
@@ -160,28 +226,28 @@ class UniversalRowWidget(QWidget):
 
     def enterEvent(self, event):
         self.setStyleSheet("background: #262626; border-radius: 6px;")
+        if hasattr(self, 'btn_edit') and self.edit_cb: self.btn_edit.show()
         if hasattr(self, 'btn_reveal'):
             self.btn_reveal.show()
         elif hasattr(self, 'drag_hint'):
             self.drag_hint.setPixmap(get_pixmap("drag_hover", 14))
             self.drag_hint.show()
-
         self.anim.stop()
         self.anim.setStartValue(self.inner_layout.contentsMargins().left())
-        self.anim.setEndValue(12) # Bounce right to 12px padding
+        self.anim.setEndValue(12)
         self.anim.start()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.setStyleSheet("background: transparent; border-radius: 6px;")
+        if hasattr(self, 'btn_edit') and self.edit_cb: self.btn_edit.hide()
         if hasattr(self, 'btn_reveal'):
             self.btn_reveal.hide()
         elif hasattr(self, 'drag_hint'):
             self.drag_hint.hide()
-
         self.anim.stop()
         self.anim.setStartValue(self.inner_layout.contentsMargins().left())
-        self.anim.setEndValue(4) # Revert to 4px padding
+        self.anim.setEndValue(4)
         self.anim.start()
         super().leaveEvent(event)
 
@@ -267,9 +333,11 @@ class MainWindow(QMainWindow):
         self.snippets: list[str] = []
         self.clipboard_history: list[str] = []
         self.assets: list[str] = []
+        self.hidden_files: list[str] = []
 
         self._load_snippets()
         self._load_assets()
+        self._load_hidden()
         self._load_clipboard_history()
 
         self._qt_clipboard = QGuiApplication.clipboard()
@@ -581,17 +649,60 @@ class MainWindow(QMainWindow):
         files.sort(key=os.path.getmtime, reverse=True)
         return files[:count]
 
-    def _add_item_row(self, list_widget: SnagList, title: str, subtitle: str, icon_name: str, file_path: str = None, data_val: str = None):
+    def _add_item_row(self, list_widget: SnagList, title: str, subtitle: str, icon_name: str, file_path: str = None, data_val: str = None, list_type: str = None):
         item = QListWidgetItem()
         if file_path:
             item.setData(Qt.ItemDataRole.UserRole, {"type": "file", "path": file_path})
         else:
             item.setData(Qt.ItemDataRole.UserRole, {"type": "text", "text": data_val})
 
-        row = UniversalRowWidget(title, subtitle, icon_name, file_path)
+        row = UniversalRowWidget(title, subtitle, icon_name, file_path, edit_cb=self._on_edit_item, data_ref=(file_path if file_path else data_val), list_type=list_type)
         item.setSizeHint(QSize(WINDOW_WIDTH - 30, 48))
         list_widget.addItem(item)
         list_widget.setItemWidget(item, row)
+
+    
+    def _load_hidden(self):
+        try:
+            with open(HIDDEN_FILE, "r") as f: self.hidden_files = json.load(f)
+        except: self.hidden_files = []
+        
+    def _save_hidden(self):
+        with open(HIDDEN_FILE, "w") as f: json.dump(self.hidden_files, f)
+        
+    def _on_edit_item(self, list_type, data_ref, title):
+        allow_rename = list_type in ["downloads", "screenshots"]
+        dlg = EditDialog(self, title, allow_rename)
+        dlg.move(QCursor.pos())
+        if dlg.exec():
+            if dlg.action == "delete":
+                if list_type in ["downloads", "screenshots"]:
+                    if data_ref not in self.hidden_files:
+                        self.hidden_files.append(data_ref)
+                        self._save_hidden()
+                elif list_type == "assets":
+                    if data_ref in self.assets:
+                        self.assets.remove(data_ref)
+                        self._save_assets()
+                elif list_type == "snippets":
+                    if data_ref in self.snippets:
+                        self.snippets.remove(data_ref)
+                        with open(SNIPPETS_FILE, "w", encoding="utf-8") as f: json.dump(self.snippets, f)
+                elif list_type == "clipboard":
+                    if data_ref in self.clipboard_history:
+                        self.clipboard_history.remove(data_ref)
+                        with open(CLIPBOARD_FILE, "w", encoding="utf-8") as f: json.dump(self.clipboard_history, f)
+            elif dlg.action == "rename" and allow_rename:
+                new_path = os.path.join(os.path.dirname(data_ref), dlg.new_title)
+                if new_path != data_ref:
+                    try:
+                        os.rename(data_ref, new_path)
+                    except:
+                        pass
+            
+            self._refresh_file_lists()
+            self._refresh_clipboard_ui()
+            self._refresh_snippets_ui()
 
     def _refresh_file_lists(self):
         if not hasattr(self, "_list_downloads"): return
@@ -599,11 +710,11 @@ class MainWindow(QMainWindow):
         self._list_assets.clear()
         for f in self.assets:
             if os.path.exists(f):
-                self._add_item_row(self._list_assets, os.path.basename(f), "Pinned Asset", "item_file", file_path=f)
+                self._add_item_row(self._list_assets, os.path.basename(f), "Pinned Asset", "item_file", file_path=f, list_type="assets")
                 
         self._list_downloads.clear()
         for f in self._get_recent_files(os.path.expanduser("~/Downloads")):
-            self._add_item_row(self._list_downloads, os.path.basename(f), "Recently Added", "item_file", file_path=f)
+            if f not in self.hidden_files: self._add_item_row(self._list_downloads, os.path.basename(f), "Recently Added", "item_file", file_path=f, list_type="downloads")
 
         sc_dirs = [os.path.expanduser("~/Desktop"), os.path.expanduser("~/Pictures/Screenshots")]
         images = []
@@ -612,7 +723,7 @@ class MainWindow(QMainWindow):
         images.sort(key=os.path.getmtime, reverse=True)
         self._list_screenshots.clear()
         for f in images[:10]:
-            self._add_item_row(self._list_screenshots, os.path.basename(f), "Recently Saved", "item_img", file_path=f)
+            if f not in self.hidden_files: self._add_item_row(self._list_screenshots, os.path.basename(f), "Recently Saved", "item_img", file_path=f, list_type="screenshots")
 
     def _refresh_clipboard_ui(self):
         if not hasattr(self, "_list_clipboard"): return
@@ -620,7 +731,7 @@ class MainWindow(QMainWindow):
         for text in self.clipboard_history:
             preview = text.replace("\n", " ").strip()
             if len(preview) > 42: preview = preview[:42] + "…"
-            self._add_item_row(self._list_clipboard, preview, "Copied text", "item_text", data_val=text)
+            self._add_item_row(self._list_clipboard, preview, "Copied text", "item_text", data_val=text, list_type="clipboard")
 
     def _add_snippet(self):
         text = self._snip_input.text().strip()
