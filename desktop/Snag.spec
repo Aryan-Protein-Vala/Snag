@@ -42,3 +42,9 @@ coll = COLLECT(
     upx_exclude=[],
     name='Snag',
 )
+app = BUNDLE(
+    coll,
+    name='Snag.app',
+    icon=None,
+    bundle_identifier=None,
+)
