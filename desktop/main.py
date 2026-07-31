@@ -98,6 +98,15 @@ class EditDialog(QDialog):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        self.original_ext = ""
+        display_title = title
+        if allow_rename and "." in title:
+            name, ext = os.path.splitext(title)
+            if ext:
+                display_title = name
+                self.original_ext = ext
+                
         self.new_title = title
         self.action = None
         
@@ -109,7 +118,7 @@ class EditDialog(QDialog):
         clayout.setContentsMargins(12, 12, 12, 12)
         clayout.setSpacing(10)
         
-        self.input_edit = QLineEdit(title)
+        self.input_edit = QLineEdit(display_title)
         self.input_edit.setStyleSheet("QLineEdit { background: #0D0D0D; color: #E0E0E0; border: 1px solid #333; border-radius: 4px; padding: 6px; }")
         if not allow_rename:
             self.input_edit.setReadOnly(True)
@@ -140,7 +149,7 @@ class EditDialog(QDialog):
         
     def _on_save(self):
         self.action = "rename"
-        self.new_title = self.input_edit.text()
+        self.new_title = self.input_edit.text() + self.original_ext
         self.accept()
 
 class UniversalRowWidget(QWidget):
