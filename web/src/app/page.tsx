@@ -91,6 +91,16 @@ const Icons = {
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
     </svg>
   ),
+  folder: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+  ),
+  moreVertical: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+    </svg>
+  ),
 };
 
 // ─── Platform SVG Logos ───────────────────────────────────────────────────
@@ -169,6 +179,7 @@ const TABS = [
   { id: "Downloads", icon: Icons.download },
   { id: "Clipboard", icon: Icons.clipboard },
   { id: "Snippets", icon: Icons.pin },
+  { id: "Assets", icon: Icons.folder },
 ];
 
 const TAB_DATA: Record<string, { icon: "img" | "file" | "text"; name: string; sub: string }[]> = {
@@ -195,13 +206,18 @@ const TAB_DATA: Record<string, { icon: "img" | "file" | "text"; name: string; su
     { icon: "text", name: "git add . && git commit -m ''", sub: "Pinned" },
     { icon: "text", name: "Dear [Name], Hope this email…", sub: "Pinned" },
   ],
+  Assets: [
+    { icon: "file", name: "brand-assets-2026.zip", sub: "Pinned" },
+    { icon: "file", name: "Q3-financial-report.pdf", sub: "Pinned" },
+    { icon: "img", name: "company-logo.svg", sub: "Pinned" },
+  ],
 };
 
 const ANNOTATIONS = [
   { id: "close", x: 60, y: 0, label: "Close & quit cleanly", lineX: 92, lineY: 6 },
-  { id: "tabs",  x: -120, y: 0, label: "4 tabs: Scrn / Down / Clip / Snip", lineX: 20, lineY: 18 },
+  { id: "tabs",  x: -120, y: 0, label: "5 tabs including new Assets", lineX: 20, lineY: 18 },
   { id: "drag",  x: 100, y: 0, label: "Drag files out to any app", lineX: 70, lineY: 90 },
-  { id: "copy",  x: 100, y: 0, label: "Click to copy to clipboard", lineX: 85, lineY: 45 },
+  { id: "edit",  x: 100, y: 0, label: "Context-aware Edit/Delete", lineX: 85, lineY: 35 },
 ];
 
 function WidgetPreview() {
@@ -254,6 +270,7 @@ function WidgetPreview() {
               </span>
               <span className="wc-item-name">{item.name}</span>
               <span className="wc-item-sub">{item.sub}</span>
+              <span className="wc-item-dots" style={{ position: "absolute", right: "26px", color: "#666" }}>{Icons.moreVertical}</span>
               <span className="wc-drag-hint">{Icons.drag}</span>
             </div>
           ))}
@@ -308,8 +325,8 @@ export default function Home() {
 
           <p className="hero-sub anim d3">
             A premium floating widget that lives at the edge of your screen.
-            Screenshots, downloads, clipboard history, and pinned snippets —
-            one keystroke away. Always ready, never in the way.
+            Screenshots, downloads, clipboard history, and permanently pinned assets —
+            all one keystroke away. Native file dragging, pixel-perfect scrolling, and zero clutter.
           </p>
 
           <div className="hero-cta anim d4">
@@ -351,10 +368,12 @@ export default function Home() {
           <h2 className="section-title">Everything you need.<br />Nothing you don&apos;t.</h2>
           <div className="features-grid" style={{ marginTop: "48px" }}>
             {[
-              { icon: Icons.screenshot, title: "Screenshot Watcher",      desc: "Automatically surfaces your last 10 screenshots the moment they land on your Desktop or Pictures folder. Drag directly into Slack, Notion, or anywhere." },
+              { icon: Icons.screenshot, title: "Screenshot Watcher",      desc: "Automatically surfaces your last 10 screenshots the moment they land on your PC (fully compatible with OneDrive Backup). Drag directly into Slack, Notion, or anywhere." },
               { icon: Icons.download,   title: "Downloads Inbox",          desc: "Your 10 most recent downloads, always one click away. Double-click to open. Hover to reveal in Explorer/Finder. Drag into any window." },
               { icon: Icons.clipboard,  title: "Clipboard History",         desc: "Persists your last 15 copied text snippets — even after restarts. Click any entry to instantly re-copy. No clutter, no feedback loops." },
               { icon: Icons.pin,        title: "Pinned Snippets",           desc: "Save boilerplate text, code blocks, credentials, or email templates permanently. Press Enter to add. Always there when you need them." },
+              { icon: Icons.folder,     title: "Pinned Assets Inbox",       desc: "Permanently pin your most used files or folders into the brand new Assets tab. They never expire and are always ready to drag." },
+              { icon: Icons.moreVertical, title: "Smart Deletion & Renaming", desc: "Context-aware Edit & Delete popup. Hide screenshots from the widget without destroying the actual file on your OS." },
               { icon: Icons.lock,       title: "Hardware-Locked License",   desc: "Each license binds to one machine UUID. Prevents key sharing without a heavy client. Backend verified via Supabase on first activation." },
               { icon: Icons.zap,        title: "Instant & Always On",       desc: "The widget is frameless, stays on top, and is positioned out of your way. Uses < 80MB RAM. Launch it with a global shortcut in seconds." },
             ].map((f, i) => (

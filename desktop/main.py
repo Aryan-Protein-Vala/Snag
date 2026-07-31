@@ -408,6 +408,7 @@ class MainWindow(QMainWindow):
         self.hide()
 
     def _upload_asset(self):
+        # pyrefly: ignore [missing-import]
         from PyQt6.QtWidgets import QFileDialog
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Asset")
         if file_path:
