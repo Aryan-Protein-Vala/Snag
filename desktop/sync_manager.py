@@ -18,6 +18,18 @@ class SyncManager(QThread):
         
         self.url = os.environ.get("SUPABASE_URL")
         self.key = os.environ.get("SUPABASE_KEY")
+        
+        # Fallback to local config file
+        if not self.url or not self.key:
+            import json
+            config_path = os.path.expanduser("~/.config/snag/config.json")
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "r") as f:
+                        cfg = json.load(f)
+                        self.url = cfg.get("SUPABASE_URL", self.url)
+                        self.key = cfg.get("SUPABASE_KEY", self.key)
+                except: pass
         self.client = None
         self.last_seen_ids = set()
         
