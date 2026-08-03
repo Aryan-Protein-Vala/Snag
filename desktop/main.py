@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+from desktop.sync_manager import SyncManager
 import subprocess
 import threading
 from pynput import keyboard
@@ -472,6 +473,8 @@ class MainWindow(QMainWindow):
         if len(self.clipboard_history) > 15: self.clipboard_history.pop()
         self._save_clipboard_history()
         self._refresh_clipboard_ui()
+        if hasattr(self, "sync_manager") and self.sync_manager:
+            self.sync_manager.push_clipboard(new_text)
 
     def _start_watchers(self):
         self.observer = Observer()
@@ -645,6 +648,27 @@ class MainWindow(QMainWindow):
         self._refresh_clipboard_ui()
         self._refresh_snippets_ui()
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            for url in urls:
+                if url.isLocalFile():
+                    self._add_asset(url.toLocalFile())
+            self._switch_tab(4)
+            event.acceptProposedAction()
+
     def _switch_tab(self, index: int, animate=True):
         for i, btn in enumerate(self._tab_btns):
             tid = ["scrn", "down", "clip", "snip", "asset"][i]
@@ -755,6 +779,8 @@ class MainWindow(QMainWindow):
             self._save_snippets()
             self._refresh_snippets_ui()
             self._snip_input.clear()
+            if hasattr(self, "sync_manager") and self.sync_manager:
+                self.sync_manager.push_snippet(text)
 
     def _refresh_snippets_ui(self):
         if not hasattr(self, "_list_snippets"): return
@@ -764,7 +790,34 @@ class MainWindow(QMainWindow):
             if len(preview) > 42: preview = preview[:42] + "…"
             self._add_item_row(self._list_snippets, preview, "Pinned snippet", "item_text", data_val=s, list_type="snippets")
 
+    def _init_sync_manager(self):
+        sync_key_path = os.path.join(APP_DIR, "sync_key.txt")
+        if not os.path.exists(sync_key_path):
+            with open(sync_key_path, "w") as f: f.write("demo_user_123")
+        with open(sync_key_path, "r") as f:
+            sync_key = f.read().strip()
+            
+        self.sync_manager = SyncManager(sync_key)
+        self.sync_manager.new_clipboard.connect(self._on_cloud_clipboard)
+        self.sync_manager.new_snippet.connect(self._on_cloud_snippet)
+        self.sync_manager.start()
+
+    def _on_cloud_clipboard(self, content):
+        if content not in self.clipboard_history:
+            self.clipboard_history.insert(0, content)
+            if len(self.clipboard_history) > 15: self.clipboard_history.pop()
+            self._save_clipboard_history()
+            self._refresh_clipboard_ui()
+
+    def _on_cloud_snippet(self, content):
+        if content not in self.snippets:
+            self.snippets.insert(0, content)
+            self._save_snippets()
+            self._refresh_snippets_ui()
+
     def _quit(self):
+        if hasattr(self, "sync_manager") and self.sync_manager:
+            self.sync_manager.stop()
         if hasattr(self, "observer"):
             self.observer.stop()
             self.observer.join()
