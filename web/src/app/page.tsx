@@ -370,9 +370,9 @@ export default function Home() {
             {[
               { icon: Icons.screenshot, title: "Screenshot Watcher",      desc: "Automatically surfaces your last 10 screenshots the moment they land on your PC (fully compatible with OneDrive Backup). Drag directly into Slack, Notion, or anywhere." },
               { icon: Icons.download,   title: "Downloads Inbox",          desc: "Your 10 most recent downloads, always one click away. Double-click to open. Hover to reveal in Explorer/Finder. Drag into any window." },
-              { icon: Icons.clipboard,  title: "Clipboard History",         desc: "Persists your last 15 copied text snippets — even after restarts. Click any entry to instantly re-copy. No clutter, no feedback loops." },
-              { icon: Icons.pin,        title: "Pinned Snippets",           desc: "Save boilerplate text, code blocks, credentials, or email templates permanently. Press Enter to add. Always there when you need them." },
-              { icon: Icons.folder,     title: "Pinned Assets Inbox",       desc: "Permanently pin your most used files or folders into the brand new Assets tab. They never expire and are always ready to drag." },
+              { icon: Icons.clipboard,  title: "Universal Clipboard (Pro)", desc: "Persists your last 15 copied text snippets and instantly syncs them across all your devices via the cloud. Copy on Mac, paste on PC." },
+              { icon: Icons.pin,        title: "Cloud Snippets (Pro)",      desc: "Save boilerplate text or code blocks permanently. Snag Pro syncs your snippets securely via Supabase so they are always there when you need them." },
+              { icon: Icons.folder,     title: "Pinned Assets Inbox",       desc: "Permanently pin your most used files into the Assets tab. Drag files out, or drop files directly onto Snag to pin them instantly." },
               { icon: Icons.moreVertical, title: "Smart Deletion & Renaming", desc: "Context-aware Edit & Delete popup. Hide screenshots from the widget without destroying the actual file on your OS." },
               { icon: Icons.lock,       title: "Hardware-Locked License",   desc: "Each license binds to one machine UUID. Prevents key sharing without a heavy client. Backend verified via Supabase on first activation." },
               { icon: Icons.zap,        title: "Instant & Always On",       desc: "The widget is frameless, stays on top, and is positioned out of your way. Uses < 80MB RAM. Launch it with a global shortcut in seconds." },
@@ -467,51 +467,40 @@ export default function Home() {
       <section className="section" id="pricing">
         <div className="container" style={{ textAlign: "center" }}>
           <div className="section-label">Pricing</div>
-          <h2 className="section-title">Own it. Or try it first.</h2>
+          <h2 className="section-title">A plan for everyone.</h2>
           <p className="section-sub" style={{ margin: "0 auto" }}>
-            No subscriptions required. Lifetime is the best value — one payment, forever yours.
+            Get the local desktop app forever, or upgrade to Snag Pro for seamless cross-device cloud sync.
           </p>
-          <div className="pricing-grid">
-            {/* Monthly */}
-            <div className="pricing-card">
-              <div className="pricing-plan">Monthly</div>
-              <div className="pricing-amount">$0.99</div>
-              <div className="pricing-period">per month</div>
-              <div className="pricing-inr">₹29 / month</div>
-              <ul className="pricing-features">
-                <li>All 4 tabs unlocked</li>
-                <li>Cross-platform access</li>
-                <li>Regular updates</li>
-              </ul>
-              <a href="#" className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }}>Start Monthly</a>
-            </div>
+          <div className="pricing-grid" style={{ gridTemplateColumns: "1fr 1fr", maxWidth: "800px", margin: "48px auto 0" }}>
             {/* Lifetime */}
-            <div className="pricing-card featured">
-              <div className="pricing-badge">Best Value</div>
-              <div className="pricing-plan">Lifetime</div>
+            <div className="pricing-card">
+              <div className="pricing-plan">Base License</div>
               <div className="pricing-amount">$14.99</div>
               <div className="pricing-period">one-time</div>
               <div className="pricing-inr">₹899 — pay once, own forever</div>
               <ul className="pricing-features">
-                <li>Everything in Monthly</li>
-                <li>All future updates included</li>
-                <li>Priority support</li>
+                <li>All 5 tabs unlocked (Screenshots, Downloads, Clipboard, Snippets, Assets)</li>
+                <li>Inbound Drag-and-Drop functionality</li>
                 <li>Hardware-locked to 1 device</li>
+                <li>Local storage only</li>
               </ul>
-              <a href="#" className="btn btn-white" style={{ width: "100%", justifyContent: "center" }}>Buy Lifetime →</a>
+              <a href="#" className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }}>Buy Lifetime</a>
             </div>
-            {/* Yearly */}
-            <div className="pricing-card">
-              <div className="pricing-plan">Yearly</div>
-              <div className="pricing-amount">$3.99</div>
-              <div className="pricing-period">per year</div>
-              <div className="pricing-inr">₹199 / year · save 66%</div>
+            {/* Snag Pro */}
+            <div className="pricing-card featured">
+              <div className="pricing-badge">Snag Pro</div>
+              <div className="pricing-plan">Cloud Sync</div>
+              <div className="pricing-amount">$1.99</div>
+              <div className="pricing-period">per month</div>
+              <div className="pricing-inr">₹100 / month (or ₹1000 / year)</div>
               <ul className="pricing-features">
-                <li>All 4 tabs unlocked</li>
-                <li>Cross-platform access</li>
-                <li>Regular updates</li>
+                <li>Everything in the Base License</li>
+                <li>Universal Clipboard (Sync across PC/Mac)</li>
+                <li>Cloud Snippets (Access pinned text anywhere)</li>
+                <li>Use on unlimited devices simultaneously</li>
+                <li>Priority support & updates</li>
               </ul>
-              <a href="#" className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }}>Start Yearly</a>
+              <a href="#" className="btn btn-white" style={{ width: "100%", justifyContent: "center" }}>Subscribe to Pro →</a>
             </div>
           </div>
         </div>
