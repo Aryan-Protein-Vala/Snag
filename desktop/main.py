@@ -655,6 +655,10 @@ class MainWindow(QMainWindow):
         self.drop_overlay.hide()
 
     def dragEnterEvent(self, event):
+        if event.source() is not None:
+            super().dragEnterEvent(event)
+            return
+            
         if event.mimeData().hasUrls():
             self.drop_overlay.resize(self.size())
             self.drop_overlay.show()
@@ -668,6 +672,10 @@ class MainWindow(QMainWindow):
         super().dragLeaveEvent(event)
 
     def dragMoveEvent(self, event):
+        if event.source() is not None:
+            super().dragMoveEvent(event)
+            return
+            
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
         else:
