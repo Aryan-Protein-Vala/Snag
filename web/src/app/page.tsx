@@ -325,12 +325,12 @@ export default function Home() {
 
           <p className="hero-sub anim d3">
             A premium floating widget that lives at the edge of your screen.
-            Screenshots, downloads, clipboard history, and permanently pinned assets —
+            Screenshots, downloads, clipboard history, pinned snippets, and assets —
             all one keystroke away. Native file dragging, pixel-perfect scrolling, and zero clutter.
           </p>
 
           <div className="hero-cta anim d4">
-            <a href="#pricing" className="btn btn-white">Get Snag — from $0.99</a>
+            <a href="#pricing" className="btn btn-white">Get Snag — from $14.99</a>
             <a href="#how" className="btn btn-ghost">See how it works</a>
           </div>
 
@@ -398,7 +398,7 @@ export default function Home() {
             {[
               { icon: Icons.terminal, title: "Install with one command",  desc: 'Run curl -fsSL snag.app/install.sh | bash in your terminal. The script handles everything — download, extract, and launch.' },
               { icon: Icons.key,      title: "Enter your license key",    desc: 'On first launch, paste your 16-character SNAG-XXXX-XXXX-XXXX key. It binds to your machine UUID. Done.' },
-              { icon: Icons.widget,   title: "Widget appears instantly",  desc: 'Snag floats in the bottom-right corner. Frameless, always-on-top. Click the tabs or drag files out immediately.' },
+              { icon: Icons.widget,   title: "Widget appears instantly",  desc: 'Snag floats in the bottom-right corner. Frameless, always-on-top. Click the tabs, drag files out, or drop files in.' },
               { icon: Icons.focus,    title: "Never leave your flow",     desc: 'Use the global shortcut to summon and dismiss it. Your clipboard history and snippets persist across restarts.' },
             ].map((s, i) => (
               <div className="how-step" key={i}>
@@ -419,7 +419,7 @@ export default function Home() {
           <div className="section-label">Comparison</div>
           <h2 className="section-title">Why not just use<br />what you already have?</h2>
           <p className="section-sub">
-            Native tools are fragmented. Snag unifies screenshots, downloads, clipboard, and snippets in one floating surface without breaking your flow.
+            Native tools are fragmented. Snag unifies screenshots, downloads, clipboard, snippets, and assets in one floating surface without breaking your flow.
           </p>
           <div className="comparison-wrapper">
             <table className="comparison-table">
@@ -438,7 +438,9 @@ export default function Home() {
                   ["Downloads panel",             "✓", "✗", "~", "✗"],
                   ["Clipboard history",           "✓", "✗", "✓", "✓"],
                   ["Pinned snippets",             "✓", "✗", "✓", "~"],
-                  ["Drag-and-drop out",           "✓", "✓", "✗", "✗"],
+                  ["Pinned assets inbox",         "✓", "✗", "✗", "✗"],
+                  ["Drag-and-drop (Out & In)",    "✓", "✓", "✗", "✗"],
+                  ["Universal Cloud Sync",        "✓", "✗", "✗", "✗"],
                   ["Always visible on screen",   "✓", "✗", "✗", "✗"],
                   ["Cross-platform (Win/Lin/Mac)","✓", "✗", "✗", "✗"],
                   ["Hardware-locked licensing",  "✓", "N/A","✗", "✗"],
