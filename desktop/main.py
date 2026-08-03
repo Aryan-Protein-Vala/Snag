@@ -649,7 +649,7 @@ class MainWindow(QMainWindow):
         self._refresh_snippets_ui()
 
         self.drop_overlay = QLabel("Drop to pin to Assets", self)
-        self.drop_overlay.setStyleSheet("background-color: rgba(94, 204, 123, 0.95); color: #111; font-size: 16px; font-weight: bold; border-radius: 14px;")
+        self.drop_overlay.setStyleSheet("background-color: rgba(20, 20, 20, 0.92); color: #E0E0E0; font-size: 15px; font-weight: bold; border: 2px dashed #555555; border-radius: 14px;")
         self.drop_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_overlay.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.drop_overlay.hide()
